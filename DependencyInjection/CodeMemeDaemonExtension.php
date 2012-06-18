@@ -24,14 +24,14 @@ class CodeMemeDaemonExtension extends Extension
         $processor = new Processor();
         $configuration = new Configuration();
         //$config = $processor->processConfiguration($configuration, $configs);
-        
+
         $loader = new Loader\XmlFileLoader($container, new FileLocator(__DIR__.'/../Resources/config'));
         $loader->load('daemon.xml');
-        
+
         $config = $this->mergeExternalConfig($configs);
         $this->_init($config, $container);
     }
-    
+
     private function mergeExternalConfig($config)
     {
         $mergedConfig = array();
@@ -40,16 +40,16 @@ class CodeMemeDaemonExtension extends Extension
         {
             $mergedConfig = array_merge($mergedConfig, $cnf);
         }
-        
+
         return $mergedConfig;
     }
-    
+
     private function getDefaultConfig($name, $container)
     {
         if (null === $this->defaultUser && function_exists('posix_geteuid')) {
                 $this->defaultUser = posix_geteuid();
-        }   
-        
+        }
+
         $defaults = array(
             'appName'               => $name,
             'appDir'                => $container->getParameter('kernel.root_dir'),
@@ -63,15 +63,18 @@ class CodeMemeDaemonExtension extends Extension
             'sysMemoryLimit'        => '1024M',
             'appRunAsUID'           => $this->defaultUser
             );
-            
+
             return $defaults;
     }
-    
+
     private function _init($config, $container)
     {
-        //merges each configured daemon with default configs 
+        if (!isset($config['daemons'])) {
+            return;
+        }
+        //merges each configured daemon with default configs
         //and makes sure the pid directory is writable
-        $cacheDir = $container->getParameter('kernel.cache_dir'); 
+        $cacheDir = $container->getParameter('kernel.cache_dir');
         $filesystem = $container->get('codememe.daemon.filesystem');
         foreach ($config['daemons'] as $name => $cnf)
         {
@@ -81,7 +84,7 @@ class CodeMemeDaemonExtension extends Extension
             } catch (CodeMemeDaemonBundleException $e) {
                 echo 'CodeMemeDaemonBundle exception: ',  $e->getMessage(), "\n";
             }
-            
+
             if (isset($cnf['appUser']) || isset($cnf['appGroup'])) {
                 if (isset($cnf['appUser']) && (function_exists('posix_getpwnam'))) {
                     $user  = posix_getpwnam($cnf['appUser']);
@@ -89,26 +92,26 @@ class CodeMemeDaemonExtension extends Extension
                         $cnf['appRunAsUID'] = $user['uid'];
                     }
                 }
-                
+
                 if (isset($cnf['appGroup']) && (function_exists('posix_getgrnam'))) {
                     $group = posix_getgrnam($cnf['appGroup']);
                     if ($group) {
                         $cnf['appRunAsGID'] = $group['gid'];
                     }
                 }
-                
+
                 if (!isset($cnf['appRunAsGID'])) {
                     $user = posix_getpwuid($cnf['appRunAsUID']);
                     $cnf['appRunAsGID'] = $user['gid'];
                 }
             }
-            
-            $container->setParameter($name.'.daemon.options', 
+
+            $container->setParameter($name.'.daemon.options',
                                      array_merge($this->getDefaultConfig($name, $container), $cnf));
         }
-        
+
     }
-    
+
     public function getXsdValidationBasePath()
     {
         return __DIR__.'/../Resources/config/';
